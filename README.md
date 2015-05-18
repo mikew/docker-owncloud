@@ -6,6 +6,9 @@ Recent version of ownCloud using nginx, php-fpm and php-apcu. Uses the official
 There is a volume at `/var/www/owncloud/user-apps/` for you to install any
 extra owncloud applications.
 
+Includes `avconv` for video thumbnails and `libreoffice-writer` for document
+previews.
+
 BYO database.
 
 BYO SSL-enabled container.
