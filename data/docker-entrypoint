@@ -172,6 +172,11 @@ function set-upload-size () {
   grep '^php_value\[upload_max_filesize\]' /etc/php5/fpm/pool.d/www.conf || echo "php_value[upload_max_filesize] = ${MAX_UPLOAD_SIZE}" >> /etc/php5/fpm/pool.d/www.conf
 }
 
+function fix-raw-post-data () {
+  grep '^always_populate_raw_post_data' /etc/php5/fpm/php.ini || echo "always_populate_raw_post_data = -1" >> /etc/php5/fpm/php.ini
+  grep '^always_populate_raw_post_data' /etc/php5/cli/php.ini || echo "always_populate_raw_post_data = -1" >> /etc/php5/cli/php.ini
+}
+
 function modify-config () {
   sed -E -i "s/'dbtype' => '.*'/'dbtype' => '${DB_TYPE}'/" "${OWNCLOUD_CONFIG}"
   sed -E -i "s/'dbname' => '.*'/'dbname' => '${DB_NAME}'/" "${OWNCLOUD_CONFIG}"
@@ -201,6 +206,7 @@ fi
 
 modify-config
 set-upload-size
+fix-raw-post-data
 load-entrypoint.d
 chown -R www-data:www-data /var/www/owncloud
 exec "$@"
