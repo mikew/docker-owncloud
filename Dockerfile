@@ -22,6 +22,7 @@ COPY data/docker-entrypoint /docker-entrypoint
 COPY data/supervisord.conf /etc/supervisor/conf.d/owncloud.conf
 COPY data/nginx.conf /etc/nginx/nginx.conf
 COPY data/cron /tmp/owncloud-cron
+COPY data/occ /usr/local/bin/occ
 #RUN crontab -u www-data /tmp/owncloud-cron && rm /tmp/owncloud-cron
 RUN su -s /bin/sh www-data -c "crontab /tmp/owncloud-cron"
 
