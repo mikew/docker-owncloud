@@ -9,14 +9,12 @@ function prepare-env () {
   DB_USER=${DB_USER:-}
   DB_PASS=${DB_PASS:-}
 
-  MAX_UPLOAD_SIZE=${NGINX_MAX_UPLOAD_SIZE:-20m}
-
-  GITLAB_MAX_SIZE=$(echo $NGINX_MAX_UPLOAD_SIZE |sed -e "s/^ *\([0-9]*\)[mMkKgG] *$/\1/g" )
-  case "$NGINX_MAX_UPLOAD_SIZE" in
-    *[kK] ) GITLAB_MAX_SIZE=$(($GITLAB_MAX_SIZE * 1024));;
-    *[mM] ) GITLAB_MAX_SIZE=$(($GITLAB_MAX_SIZE * 1048576));;
-    *[gG] ) GITLAB_MAX_SIZE=$(($GITLAB_MAX_SIZE * 1073741824));;
-  esac
+  #GITLAB_MAX_SIZE=$(echo $MAX_UPLOAD_SIZE |sed -e "s/^ *\([0-9]*\)[mMkKgG] *$/\1/g" )
+  #case "$NGINX_MAX_UPLOAD_SIZE" in
+  #  *[kK] ) GITLAB_MAX_SIZE=$(($GITLAB_MAX_SIZE * 1024));;
+  #  *[mM] ) GITLAB_MAX_SIZE=$(($GITLAB_MAX_SIZE * 1048576));;
+  #  *[gG] ) GITLAB_MAX_SIZE=$(($GITLAB_MAX_SIZE * 1073741824));;
+  #esac
 
   if [ -n "${MYSQL_PORT_3306_TCP_ADDR}" ]; then
     DB_TYPE=${DB_TYPE:-mysql}
@@ -39,7 +37,7 @@ function prepare-env () {
     DB_PASS=${DB_PASS:-${MYSQL_ENV_MYSQL_PASSWORD}}
     DB_NAME=${DB_NAME:-${MYSQL_ENV_MYSQL_DATABASE}}
   elif [ -n "${POSTGRES_PORT_5432_TCP_ADDR}" ]; then
-    DB_TYPE=${DB_TYPE:-postgres}
+    DB_TYPE=${DB_TYPE:-pgsql}
     DB_HOST=${DB_HOST:-${POSTGRES_PORT_5432_TCP_ADDR}}
     DB_PORT=${DB_PORT:-${POSTGRES_PORT_5432_TCP_PORT}}
 
@@ -84,6 +82,7 @@ function prepare-env () {
   #    ;;
   #esac
 
+  export MAX_UPLOAD_SIZE
   export DB_TYPE=${DB_TYPE:-sqlite3}
   export DB_HOST=${DB_HOST:-localhost}
   export DB_PORT=${DB_PORT:-}
@@ -94,7 +93,6 @@ function prepare-env () {
   export ADMIN_USER=${ADMIN_USER:-admin}
   export ADMIN_PASS=${ADMIN_PASS:-changeme}
   export DATA_DIR=${DATA_DIR:-/var/www/owncloud/data}
-  export OWNCLOUD_CONFIG=${OWNCLOUD_CONFIG:-/var/www/owncloud/config/autoconfig.php}
 }
 
 function load-entrypoint.d () {
@@ -124,37 +122,85 @@ function replace-all-env-vars () {
   echo "${contents}"
 }
 
+function create-autoconfig () {
+  cat > "${OWNCLOUD_AUTOCONFIG}" <<-EOF
+<?php
+\$AUTOCONFIG = array (
+  'dbtype' => '$DB_TYPE',
+  'dbhost' => '$DB_HOST',
+  'dbname' => '$DB_NAME',
+  'dbuser' => '$DB_USER',
+  'dbpass' => '$DB_PASS',
+  'dbtableprefix' => '$DB_TABLE_PREFIX',
+  'adminlogin' => '$ADMIN_USER',
+  'adminpass' => '$ADMIN_PASS',
+  'directory' => '$DATA_DIR',
+);
+EOF
+
+  chown www-data:www-data "${OWNCLOUD_AUTOCONFIG}"
+}
+
 function create-config () {
   cat > "${OWNCLOUD_CONFIG}" <<-EOF
 <?php
-\$AUTOCONFIG = array(
-  "dbtype" => "$DB_TYPE",
-  "dbname" => "$DB_NAME",
-  "dbuser" => "$DB_USER",
-  "dbpassword" => "$DB_PASS",
-  "dbpass" => "$DB_PASS",
-  "dbhost" => "$DB_HOST",
-  "dbtableprefix" => "$DB_TABLE_PREFIX",
-  "adminlogin" => "$ADMIN_USER",
-  "adminpass" => "$ADMIN_PASS",
-  "datadirectory" => "$DATA_DIR",
-  "directory" => "$DATA_DIR",
+\$CONFIG = array (
+  'apps_paths' => array(
+    array(
+      'path'=> '/var/www/owncloud/apps',
+      'url' => '/apps',
+      'writable' => true,
+    ),
+    array(
+      'path'=> '/var/www/owncloud/user-apps',
+      'url' => '/user-apps',
+      'writable' => false,
+    ),
+  ),
 );
 EOF
+
   chown www-data:www-data "${OWNCLOUD_CONFIG}"
 }
 
 function set-upload-size () {
-  sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 2M/' /etc/php5/fpm/php.ini
+  sed -E -i "s/upload_max_filesize = .*/upload_max_filesize = ${MAX_UPLOAD_SIZE}/" /etc/php5/fpm/php.ini
+  sed -E -i "s/post_max_size = .*/post_max_size = ${MAX_UPLOAD_SIZE}/" /etc/php5/fpm/php.ini
+  sed -E -i "s/client_max_body_size .*;/client_max_body_size ${MAX_UPLOAD_SIZE};/" /etc/nginx/nginx.conf
+
+  grep '^php_value\[post_max_size\]' /etc/php5/fpm/pool.d/www.conf || echo "php_value[post_max_size] = ${MAX_UPLOAD_SIZE}" >> /etc/php5/fpm/pool.d/www.conf
+  grep '^php_value\[upload_max_filesize\]' /etc/php5/fpm/pool.d/www.conf || echo "php_value[upload_max_filesize] = ${MAX_UPLOAD_SIZE}" >> /etc/php5/fpm/pool.d/www.conf
+}
+
+function modify-config () {
+  sed -E -i "s/'dbtype' => '.*'/'dbtype' => '${DB_TYPE}'/" "${OWNCLOUD_CONFIG}"
+  sed -E -i "s/'dbname' => '.*'/'dbname' => '${DB_NAME}'/" "${OWNCLOUD_CONFIG}"
+  sed -E -i "s/'dbuser' => '.*'/'dbuser' => '${DB_USER}'/" "${OWNCLOUD_CONFIG}"
+  sed -E -i "s/'dbpassword' => '.*'/'dbpassword' => '${DB_PASS}'/" "${OWNCLOUD_CONFIG}"
+  sed -E -i "s/'dbhost' => '.*'/'dbhost' => '${DB_HOST}'/" "${OWNCLOUD_CONFIG}"
+  sed -E -i "s/'dbtableprefix' => '.*'/'dbtableprefix' => '${DB_TABLE_PREFIX}'/" "${OWNCLOUD_CONFIG}"
+
+  if [ -f "${OWNCLOUD_AUTOCONFIG}" ]; then
+    sed -E -i "s/'dbtype' => '.*'/'dbtype' => '${DB_TYPE}'/" "${OWNCLOUD_AUTOCONFIG}"
+    sed -E -i "s/'dbname' => '.*'/'dbname' => '${DB_NAME}'/" "${OWNCLOUD_AUTOCONFIG}"
+    sed -E -i "s/'dbuser' => '.*'/'dbuser' => '${DB_USER}'/" "${OWNCLOUD_AUTOCONFIG}"
+    sed -E -i "s/'dbpass' => '.*'/'dbpass' => '${DB_PASS}'/" "${OWNCLOUD_AUTOCONFIG}"
+    sed -E -i "s/'dbhost' => '.*'/'dbhost' => '${DB_HOST}'/" "${OWNCLOUD_AUTOCONFIG}"
+    sed -E -i "s/'dbtableprefix' => '.*'/'dbtableprefix' => '${DB_TABLE_PREFIX}'/" "${OWNCLOUD_AUTOCONFIG}"
+  fi
 }
 
 prepare-env
 
+OWNCLOUD_CONFIG=/var/www/owncloud/config/config.php
+OWNCLOUD_AUTOCONFIG=/var/www/owncloud/config/autoconfig.php
 if [ ! -f "${OWNCLOUD_CONFIG}" ]; then
+  create-autoconfig
   create-config
 fi
 
+modify-config
 set-upload-size
 load-entrypoint.d
-#cat /var/www/owncloud/config.php | replace-all-env-vars > /var/www/owncloud/config.php
+chown -R www-data:www-data /var/www/owncloud
 exec "$@"
