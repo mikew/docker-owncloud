@@ -1,0 +1,24 @@
+web:
+  build: .
+  volumes:
+    - ./data/docker-entrypoint:/docker-entrypoint
+  links:
+    - postgres:postgres
+  environment:
+    - VIRTUAL_HOST=cloud.apps.bravenewworld.io
+
+postgres:
+  image: postgres:9.4
+  environment:
+    - POSTGRES_USER=owncloud
+    - POSTGRES_PASSWORD=owncloud
+  #volumes:
+  #  - ./owncloud.dump:/owncloud.dump
+  #volumes_from:
+  #  - dbdata
+
+#dbdata:
+#  image: alpine
+#  command: "true"
+#  volumes:
+#    - /var/lib/postgresql/data

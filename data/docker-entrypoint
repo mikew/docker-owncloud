@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+
+function prepare-env () {
+
+  DB_TYPE=${DB_TYPE:-}
+  DB_HOST=${DB_HOST:-}
+  DB_PORT=${DB_PORT:-}
+  DB_NAME=${DB_NAME:-}
+  DB_USER=${DB_USER:-}
+  DB_PASS=${DB_PASS:-}
+
+  MAX_UPLOAD_SIZE=${NGINX_MAX_UPLOAD_SIZE:-20m}
+
+  GITLAB_MAX_SIZE=$(echo $NGINX_MAX_UPLOAD_SIZE |sed -e "s/^ *\([0-9]*\)[mMkKgG] *$/\1/g" )
+  case "$NGINX_MAX_UPLOAD_SIZE" in
+    *[kK] ) GITLAB_MAX_SIZE=$(($GITLAB_MAX_SIZE * 1024));;
+    *[mM] ) GITLAB_MAX_SIZE=$(($GITLAB_MAX_SIZE * 1048576));;
+    *[gG] ) GITLAB_MAX_SIZE=$(($GITLAB_MAX_SIZE * 1073741824));;
+  esac
+
+  if [ -n "${MYSQL_PORT_3306_TCP_ADDR}" ]; then
+    DB_TYPE=${DB_TYPE:-mysql}
+    DB_HOST=${DB_HOST:-${MYSQL_PORT_3306_TCP_ADDR}}
+    DB_PORT=${DB_PORT:-${MYSQL_PORT_3306_TCP_PORT}}
+
+    # support for linked official mysql image
+    DB_USER=${DB_USER:-${MYSQL_ENV_MYSQL_USER}}
+    DB_PASS=${DB_PASS:-${MYSQL_ENV_MYSQL_PASSWORD}}
+    DB_NAME=${DB_NAME:-${DB_USER}}
+
+    # support for linked sameersbn/mysql image
+    DB_USER=${DB_USER:-${MYSQL_ENV_DB_USER}}
+    DB_PASS=${DB_PASS:-${MYSQL_ENV_DB_PASS}}
+    DB_NAME=${DB_NAME:-${MYSQL_ENV_DB_NAME}}
+
+    # support for linked orchardup/mysql and enturylink/mysql image
+    # also supports official mysql image
+    DB_USER=${DB_USER:-${MYSQL_ENV_MYSQL_USER}}
+    DB_PASS=${DB_PASS:-${MYSQL_ENV_MYSQL_PASSWORD}}
+    DB_NAME=${DB_NAME:-${MYSQL_ENV_MYSQL_DATABASE}}
+  elif [ -n "${POSTGRES_PORT_5432_TCP_ADDR}" ]; then
+    DB_TYPE=${DB_TYPE:-postgres}
+    DB_HOST=${DB_HOST:-${POSTGRES_PORT_5432_TCP_ADDR}}
+    DB_PORT=${DB_PORT:-${POSTGRES_PORT_5432_TCP_PORT}}
+
+    # support for linked official postgres image
+    DB_USER=${DB_USER:-${POSTGRES_ENV_POSTGRES_USER}}
+    DB_PASS=${DB_PASS:-${POSTGRES_ENV_POSTGRES_PASSWORD}}
+    DB_NAME=${DB_NAME:-${DB_USER}}
+
+    # support for linked sameersbn/postgresql image
+    DB_USER=${DB_USER:-${POSTGRES_ENV_DB_USER}}
+    DB_PASS=${DB_PASS:-${POSTGRES_ENV_DB_PASS}}
+    DB_NAME=${DB_NAME:-${POSTGRES_ENV_DB_NAME}}
+
+    # support for linked orchardup/postgresql image
+    DB_USER=${DB_USER:-${POSTGRES_ENV_POSTGRESQL_USER}}
+    DB_PASS=${DB_PASS:-${POSTGRES_ENV_POSTGRESQL_PASS}}
+    DB_NAME=${DB_NAME:-${POSTGRES_ENV_POSTGRESQL_DB}}
+
+    # support for linked paintedfox/postgresql image
+    DB_USER=${DB_USER:-${POSTGRES_ENV_USER}}
+    DB_PASS=${DB_PASS:-${POSTGRES_ENV_PASS}}
+    DB_NAME=${DB_NAME:-${POSTGRES_ENV_DB}}
+  fi
+
+  #if [ -z "${DB_HOST}" ]; then
+  #  echo "ERROR: "
+  #  echo "  Please configure the database connection."
+  #  echo "  Refer http://git.io/wkYhyA for more information."
+  #  echo "  Cannot continue without a database. Aborting..."
+  #  exit 1
+  #fi
+  #
+  ## use default port number if it is still not set
+  #case "${DB_TYPE}" in
+  #  mysql) DB_PORT=${DB_PORT:-3306} ;;
+  #  postgres) DB_PORT=${DB_PORT:-5432} ;;
+  #  *)
+  #    echo "ERROR: "
+  #    echo "  Please specify the database type in use via the DB_TYPE configuration option."
+  #    echo "  Accepted values are \"postgres\" or \"mysql\". Aborting..."
+  #    exit 1
+  #    ;;
+  #esac
+
+  export DB_TYPE=${DB_TYPE:-sqlite3}
+  export DB_HOST=${DB_HOST:-localhost}
+  export DB_PORT=${DB_PORT:-}
+  export DB_NAME=${DB_NAME:-owncloud}
+  export DB_USER=${DB_USER:-owncloud}
+  export DB_PASS=${DB_PASS:-owncloud}
+  export DB_TABLE_PREFIX=${DB_TABLE_PREFIX:-oc_}
+  export ADMIN_USER=${ADMIN_USER:-admin}
+  export ADMIN_PASS=${ADMIN_PASS:-changeme}
+  export DATA_DIR=${DATA_DIR:-/var/www/owncloud/data}
+  export OWNCLOUD_CONFIG=${OWNCLOUD_CONFIG:-/var/www/owncloud/config/autoconfig.php}
+}
+
+function load-entrypoint.d () {
+  if [ -d /docker-entrypoint.d ]; then
+    for f in /docker-entrypoint.d/*.sh; do
+      [ -f "$f" ] && . "$f"
+    done
+  fi
+}
+
+function replace-all-env-vars () {
+  # Work with either `cat /file | replace-all-env-vars` and
+  # `replace-all-env-vars /file`
+  [ $# -ge 1 -a -f "$1" ] && input="$1" || input="-"
+  local contents=$(cat $input)
+
+  # Loop through each environment variable name
+  for v in $(env | cut -d '=' -f1); do
+    # Only look for things like `__PATH__`
+    local needle="__${v}__"
+    if [[ "${contents}" =~ "${needle}" ]]; then
+      # Replace all instances of needle with the value of `$v`
+      contents="${contents//$needle/${!v}}"
+    fi
+  done
+
+  echo "${contents}"
+}
+
+function create-config () {
+  cat > "${OWNCLOUD_CONFIG}" <<-EOF
+<?php
+\$AUTOCONFIG = array(
+  "dbtype" => "$DB_TYPE",
+  "dbname" => "$DB_NAME",
+  "dbuser" => "$DB_USER",
+  "dbpassword" => "$DB_PASS",
+  "dbpass" => "$DB_PASS",
+  "dbhost" => "$DB_HOST",
+  "dbtableprefix" => "$DB_TABLE_PREFIX",
+  "adminlogin" => "$ADMIN_USER",
+  "adminpass" => "$ADMIN_PASS",
+  "datadirectory" => "$DATA_DIR",
+  "directory" => "$DATA_DIR",
+);
+EOF
+  chown www-data:www-data "${OWNCLOUD_CONFIG}"
+}
+
+function set-upload-size () {
+  sed -i 's/upload_max_filesize = 2M/upload_max_filesize = 2M/' /etc/php5/fpm/php.ini
+}
+
+prepare-env
+
+if [ ! -f "${OWNCLOUD_CONFIG}" ]; then
+  create-config
+fi
+
+set-upload-size
+load-entrypoint.d
+#cat /var/www/owncloud/config.php | replace-all-env-vars > /var/www/owncloud/config.php
+exec "$@"
