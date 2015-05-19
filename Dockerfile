@@ -28,7 +28,7 @@ RUN su -s /bin/sh www-data -c "crontab /tmp/owncloud-cron"
 
 VOLUME /var/www/owncloud/config
 VOLUME /var/www/owncloud/data
-VOLUME /var/www/owncloud/user-apps
+VOLUME /var/www/owncloud/apps
 VOLUME /var/log/owncloud
 WORKDIR /var/www/owncloud
 

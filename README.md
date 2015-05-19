@@ -3,8 +3,9 @@
 Recent version of ownCloud using nginx, php-fpm and php-apcu. Uses the official
 `owncloud.tar.bz2` from https://owncloud.org/install.
 
-There is a volume at `/var/www/owncloud/user-apps/` for you to install any
-extra owncloud applications.
+The default config supports installing owncloud apps to
+`/var/www/owncloud/user-apps/` so you don't have to interfere with any default
+apps.
 
 Includes `avconv` for video thumbnails and `libreoffice-writer` for document
 previews.
