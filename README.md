@@ -18,14 +18,14 @@ BYO SSL-enabled container.
 
 ```bash
 docker run --name owncloud-postgres postgres:9.4
-docker run --publish 80 --link owncloud-postgres:postgres mikewhy/owncloud:8.0.3-1
+docker run --publish 80 --link owncloud-postgres:postgres mikewhy/owncloud:8.0.3-3
 ```
 
 Or using docker-compose:
 
 ```yaml
 web:
-  image: mikewhy/owncloud:8.0.3-1
+  image: mikewhy/owncloud:8.0.3-3
   links:
     - postgres:postgres
 
