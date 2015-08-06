@@ -1,6 +1,6 @@
 FROM debian:jessie
 
-ENV OWNCLOUD_VERSION=8.0.4
+ENV OWNCLOUD_VERSION=8.0.5
 ENV MAX_UPLOAD_SIZE=30G
 
 RUN sed -i 's/httpredir/http.us/g' /etc/apt/sources.list \
