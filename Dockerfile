@@ -1,8 +1,5 @@
 FROM debian:jessie
 
-ENV OWNCLOUD_VERSION=8.0.5
-ENV MAX_UPLOAD_SIZE=30G
-
 RUN sed -i 's/httpredir/http.us/g' /etc/apt/sources.list \
     && apt-get update \
     && apt-get install -y curl cron bzip2 smbclient nginx supervisor libav-tools libreoffice-writer \
@@ -12,6 +9,7 @@ RUN sed -i 's/httpredir/http.us/g' /etc/apt/sources.list \
     && apt-get autoclean \
     && apt-get autoremove
 
+ENV OWNCLOUD_VERSION=8.1.1
 RUN curl -L https://download.owncloud.org/community/owncloud-${OWNCLOUD_VERSION}.tar.bz2 | tar -xj -C /var/www
 
 RUN mkdir /docker-entrypoint.d /var/www/owncloud/user-apps /var/log/owncloud
@@ -26,9 +24,11 @@ COPY data/occ /usr/local/bin/occ
 #RUN crontab -u www-data /tmp/owncloud-cron && rm /tmp/owncloud-cron
 RUN su -s /bin/sh www-data -c "crontab /tmp/owncloud-cron"
 
+ENV MAX_UPLOAD_SIZE=30G
 VOLUME /var/www/owncloud/config
 VOLUME /var/www/owncloud/data
 VOLUME /var/www/owncloud/apps
+VOLUME /var/www/owncloud/assets
 VOLUME /var/log/owncloud
 WORKDIR /var/www/owncloud
 

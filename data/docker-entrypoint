@@ -1,98 +1,99 @@
 #!/usr/bin/env bash
 
-function prepare-env () {
+OWNCLOUD_CONFIG=/var/www/owncloud/config/config.php
+DOCKER_OWNCLOUD_CONFIG=/var/www/owncloud/config/docker_config.php
+#OWNCLOUD_AUTOCONFIG=/var/www/owncloud/config/autoconfig.php
+MAX_UPLOAD_SIZE=${MAX_UPLOAD_SIZE:-30G}
+DB_TABLE_PREFIX=${DB_TABLE_PREFIX:-oc_}
+ADMIN_USER=${ADMIN_USER:-admin}
+ADMIN_PASS=${ADMIN_PASS:-changeme}
+DATA_DIR=${DATA_DIR:-/var/www/owncloud/data}
+TRUSTED_DOMAIN=${TRUSTED_DOMAIN:-${VIRTUAL_HOST:-}}
+ENABLE_EXTRA_PREVIEW_PROVIDERS=${ENABLE_EXTRA_PREVIEW_PROVIDERS:-true}
+MAIN_PID=-2
+DB_TYPE=${DB_TYPE:-}
+DB_HOST=${DB_HOST:-}
+DB_PORT=${DB_PORT:-}
+DB_NAME=${DB_NAME:-}
+DB_USER=${DB_USER:-}
+DB_PASS=${DB_PASS:-}
 
-  DB_TYPE=${DB_TYPE:-}
-  DB_HOST=${DB_HOST:-}
-  DB_PORT=${DB_PORT:-}
-  DB_NAME=${DB_NAME:-}
-  DB_USER=${DB_USER:-}
-  DB_PASS=${DB_PASS:-}
+if [ -n "${MYSQL_PORT_3306_TCP_ADDR}" ]; then
+  DB_TYPE=${DB_TYPE:-mysql}
+  DB_HOST=${DB_HOST:-${MYSQL_PORT_3306_TCP_ADDR}}
+  DB_PORT=${DB_PORT:-${MYSQL_PORT_3306_TCP_PORT}}
 
-  #GITLAB_MAX_SIZE=$(echo $MAX_UPLOAD_SIZE |sed -e "s/^ *\([0-9]*\)[mMkKgG] *$/\1/g" )
-  #case "$NGINX_MAX_UPLOAD_SIZE" in
-  #  *[kK] ) GITLAB_MAX_SIZE=$(($GITLAB_MAX_SIZE * 1024));;
-  #  *[mM] ) GITLAB_MAX_SIZE=$(($GITLAB_MAX_SIZE * 1048576));;
-  #  *[gG] ) GITLAB_MAX_SIZE=$(($GITLAB_MAX_SIZE * 1073741824));;
-  #esac
+  # support for linked official mysql image
+  DB_USER=${DB_USER:-${MYSQL_ENV_MYSQL_USER}}
+  DB_PASS=${DB_PASS:-${MYSQL_ENV_MYSQL_PASSWORD}}
+  DB_NAME=${DB_NAME:-${DB_USER}}
 
-  if [ -n "${MYSQL_PORT_3306_TCP_ADDR}" ]; then
-    DB_TYPE=${DB_TYPE:-mysql}
-    DB_HOST=${DB_HOST:-${MYSQL_PORT_3306_TCP_ADDR}}
-    DB_PORT=${DB_PORT:-${MYSQL_PORT_3306_TCP_PORT}}
+  # support for linked sameersbn/mysql image
+  DB_USER=${DB_USER:-${MYSQL_ENV_DB_USER}}
+  DB_PASS=${DB_PASS:-${MYSQL_ENV_DB_PASS}}
+  DB_NAME=${DB_NAME:-${MYSQL_ENV_DB_NAME}}
 
-    # support for linked official mysql image
-    DB_USER=${DB_USER:-${MYSQL_ENV_MYSQL_USER}}
-    DB_PASS=${DB_PASS:-${MYSQL_ENV_MYSQL_PASSWORD}}
-    DB_NAME=${DB_NAME:-${DB_USER}}
+  # support for linked orchardup/mysql and enturylink/mysql image
+  # also supports official mysql image
+  DB_USER=${DB_USER:-${MYSQL_ENV_MYSQL_USER}}
+  DB_PASS=${DB_PASS:-${MYSQL_ENV_MYSQL_PASSWORD}}
+  DB_NAME=${DB_NAME:-${MYSQL_ENV_MYSQL_DATABASE}}
+elif [ -n "${POSTGRES_PORT_5432_TCP_ADDR}" ]; then
+  DB_TYPE=${DB_TYPE:-pgsql}
+  DB_HOST=${DB_HOST:-${POSTGRES_PORT_5432_TCP_ADDR}}
+  DB_PORT=${DB_PORT:-${POSTGRES_PORT_5432_TCP_PORT}}
 
-    # support for linked sameersbn/mysql image
-    DB_USER=${DB_USER:-${MYSQL_ENV_DB_USER}}
-    DB_PASS=${DB_PASS:-${MYSQL_ENV_DB_PASS}}
-    DB_NAME=${DB_NAME:-${MYSQL_ENV_DB_NAME}}
+  # support for linked official postgres image
+  DB_USER=${DB_USER:-${POSTGRES_ENV_POSTGRES_USER}}
+  DB_PASS=${DB_PASS:-${POSTGRES_ENV_POSTGRES_PASSWORD}}
+  DB_NAME=${DB_NAME:-${DB_USER}}
 
-    # support for linked orchardup/mysql and enturylink/mysql image
-    # also supports official mysql image
-    DB_USER=${DB_USER:-${MYSQL_ENV_MYSQL_USER}}
-    DB_PASS=${DB_PASS:-${MYSQL_ENV_MYSQL_PASSWORD}}
-    DB_NAME=${DB_NAME:-${MYSQL_ENV_MYSQL_DATABASE}}
-  elif [ -n "${POSTGRES_PORT_5432_TCP_ADDR}" ]; then
-    DB_TYPE=${DB_TYPE:-pgsql}
-    DB_HOST=${DB_HOST:-${POSTGRES_PORT_5432_TCP_ADDR}}
-    DB_PORT=${DB_PORT:-${POSTGRES_PORT_5432_TCP_PORT}}
+  # support for linked sameersbn/postgresql image
+  DB_USER=${DB_USER:-${POSTGRES_ENV_DB_USER}}
+  DB_PASS=${DB_PASS:-${POSTGRES_ENV_DB_PASS}}
+  DB_NAME=${DB_NAME:-${POSTGRES_ENV_DB_NAME}}
 
-    # support for linked official postgres image
-    DB_USER=${DB_USER:-${POSTGRES_ENV_POSTGRES_USER}}
-    DB_PASS=${DB_PASS:-${POSTGRES_ENV_POSTGRES_PASSWORD}}
-    DB_NAME=${DB_NAME:-${DB_USER}}
+  # support for linked orchardup/postgresql image
+  DB_USER=${DB_USER:-${POSTGRES_ENV_POSTGRESQL_USER}}
+  DB_PASS=${DB_PASS:-${POSTGRES_ENV_POSTGRESQL_PASS}}
+  DB_NAME=${DB_NAME:-${POSTGRES_ENV_POSTGRESQL_DB}}
 
-    # support for linked sameersbn/postgresql image
-    DB_USER=${DB_USER:-${POSTGRES_ENV_DB_USER}}
-    DB_PASS=${DB_PASS:-${POSTGRES_ENV_DB_PASS}}
-    DB_NAME=${DB_NAME:-${POSTGRES_ENV_DB_NAME}}
+  # support for linked paintedfox/postgresql image
+  DB_USER=${DB_USER:-${POSTGRES_ENV_USER}}
+  DB_PASS=${DB_PASS:-${POSTGRES_ENV_PASS}}
+  DB_NAME=${DB_NAME:-${POSTGRES_ENV_DB}}
+fi
 
-    # support for linked orchardup/postgresql image
-    DB_USER=${DB_USER:-${POSTGRES_ENV_POSTGRESQL_USER}}
-    DB_PASS=${DB_PASS:-${POSTGRES_ENV_POSTGRESQL_PASS}}
-    DB_NAME=${DB_NAME:-${POSTGRES_ENV_POSTGRESQL_DB}}
+DB_TYPE=${DB_TYPE:-sqlite3}
+DB_HOST=${DB_HOST:-localhost}
+DB_PORT=${DB_PORT:-}
+DB_NAME=${DB_NAME:-owncloud}
+DB_USER=${DB_USER:-owncloud}
+DB_PASS=${DB_PASS:-owncloud}
 
-    # support for linked paintedfox/postgresql image
-    DB_USER=${DB_USER:-${POSTGRES_ENV_USER}}
-    DB_PASS=${DB_PASS:-${POSTGRES_ENV_PASS}}
-    DB_NAME=${DB_NAME:-${POSTGRES_ENV_DB}}
-  fi
+function main () {
+  create-config
+  create-docker-config
+  modify-trusted-domains
+  download-owncloud-certs
+  set-upload-size
+  fix-raw-post-data
+  fix-apc-enable_cli
+  fix-clear_env
+  fix-permissions
+  install-and-upgrade
+  include-docker-config
+  load-entrypoint.d
 
-  #if [ -z "${DB_HOST}" ]; then
-  #  echo "ERROR: "
-  #  echo "  Please configure the database connection."
-  #  echo "  Refer http://git.io/wkYhyA for more information."
-  #  echo "  Cannot continue without a database. Aborting..."
-  #  exit 1
-  #fi
-  #
-  ## use default port number if it is still not set
-  #case "${DB_TYPE}" in
-  #  mysql) DB_PORT=${DB_PORT:-3306} ;;
-  #  postgres) DB_PORT=${DB_PORT:-5432} ;;
-  #  *)
-  #    echo "ERROR: "
-  #    echo "  Please specify the database type in use via the DB_TYPE configuration option."
-  #    echo "  Accepted values are \"postgres\" or \"mysql\". Aborting..."
-  #    exit 1
-  #    ;;
-  #esac
+  trap teardown SIGTERM SIGINT
+  "$@" &
+  MAIN_PID=$!
+  wait $MAIN_PID
+}
 
-  export MAX_UPLOAD_SIZE
-  export DB_TYPE=${DB_TYPE:-sqlite3}
-  export DB_HOST=${DB_HOST:-localhost}
-  export DB_PORT=${DB_PORT:-}
-  export DB_NAME=${DB_NAME:-owncloud}
-  export DB_USER=${DB_USER:-owncloud}
-  export DB_PASS=${DB_PASS:-owncloud}
-  export DB_TABLE_PREFIX=${DB_TABLE_PREFIX:-oc_}
-  export ADMIN_USER=${ADMIN_USER:-admin}
-  export ADMIN_PASS=${ADMIN_PASS:-changeme}
-  export DATA_DIR=${DATA_DIR:-/var/www/owncloud/data}
+function teardown () {
+  kill -- $MAIN_PID
+  wait -- $MAIN_PID
 }
 
 function load-entrypoint.d () {
@@ -103,60 +104,30 @@ function load-entrypoint.d () {
   fi
 }
 
-function replace-all-env-vars () {
-  # Work with either `cat /file | replace-all-env-vars` and
-  # `replace-all-env-vars /file`
-  [ $# -ge 1 -a -f "$1" ] && input="$1" || input="-"
-  local contents=$(cat $input)
-
-  # Loop through each environment variable name
-  for v in $(env | cut -d '=' -f1); do
-    # Only look for things like `__PATH__`
-    local needle="__${v}__"
-    if [[ "${contents}" =~ "${needle}" ]]; then
-      # Replace all instances of needle with the value of `$v`
-      contents="${contents//$needle/${!v}}"
-    fi
-  done
-
-  echo "${contents}"
-}
-
-function create-autoconfig () {
-  cat > "${OWNCLOUD_AUTOCONFIG}" <<-EOF
-<?php
-\$AUTOCONFIG = array (
-  'dbtype' => '$DB_TYPE',
-  'dbhost' => '$DB_HOST',
-  'dbname' => '$DB_NAME',
-  'dbuser' => '$DB_USER',
-  'dbpass' => '$DB_PASS',
-  'dbtableprefix' => '$DB_TABLE_PREFIX',
-  'adminlogin' => '$ADMIN_USER',
-  'adminpass' => '$ADMIN_PASS',
-  'directory' => '$DATA_DIR',
-);
-EOF
-
-  chown www-data:www-data "${OWNCLOUD_AUTOCONFIG}"
-}
-
 function create-config () {
+  [ -f "${OWNCLOUD_CONFIG}" ] && return
+
   cat > "${OWNCLOUD_CONFIG}" <<-EOF
 <?php
 \$CONFIG = array (
+  'memcache.local' => '\OC\Memcache\APCu',
+
   'apps_paths' => array(
     array(
       'path'=> '/var/www/owncloud/apps',
       'url' => '/apps',
       'writable' => true,
     ),
+
     array(
       'path'=> '/var/www/owncloud/user-apps',
       'url' => '/user-apps',
       'writable' => false,
     ),
   ),
+
+  'asset-pipeline.enabled' => true,
+
 );
 EOF
 
@@ -172,41 +143,115 @@ function set-upload-size () {
   grep '^php_value\[upload_max_filesize\]' /etc/php5/fpm/pool.d/www.conf || echo "php_value[upload_max_filesize] = ${MAX_UPLOAD_SIZE}" >> /etc/php5/fpm/pool.d/www.conf
 }
 
+# TODO can be moved to Dockerfile
 function fix-raw-post-data () {
   grep '^always_populate_raw_post_data' /etc/php5/fpm/php.ini || echo "always_populate_raw_post_data = -1" >> /etc/php5/fpm/php.ini
   grep '^always_populate_raw_post_data' /etc/php5/cli/php.ini || echo "always_populate_raw_post_data = -1" >> /etc/php5/cli/php.ini
 }
 
-function modify-config () {
-  sed -E -i "s/'dbtype' => '.*'/'dbtype' => '${DB_TYPE}'/" "${OWNCLOUD_CONFIG}"
-  sed -E -i "s/'dbname' => '.*'/'dbname' => '${DB_NAME}'/" "${OWNCLOUD_CONFIG}"
-  sed -E -i "s/'dbuser' => '.*'/'dbuser' => '${DB_USER}'/" "${OWNCLOUD_CONFIG}"
-  sed -E -i "s/'dbpassword' => '.*'/'dbpassword' => '${DB_PASS}'/" "${OWNCLOUD_CONFIG}"
-  sed -E -i "s/'dbhost' => '.*'/'dbhost' => '${DB_HOST}'/" "${OWNCLOUD_CONFIG}"
-  sed -E -i "s/'dbtableprefix' => '.*'/'dbtableprefix' => '${DB_TABLE_PREFIX}'/" "${OWNCLOUD_CONFIG}"
+# TODO can be moved to Dockerfile
+function fix-clear_env () {
+  grep '^clear_env' /etc/php5/fpm/php-fpm.conf || echo "clear_env = no" >> /etc/php5/fpm/php-fpm.conf
+}
 
-  if [ -f "${OWNCLOUD_AUTOCONFIG}" ]; then
-    sed -E -i "s/'dbtype' => '.*'/'dbtype' => '${DB_TYPE}'/" "${OWNCLOUD_AUTOCONFIG}"
-    sed -E -i "s/'dbname' => '.*'/'dbname' => '${DB_NAME}'/" "${OWNCLOUD_AUTOCONFIG}"
-    sed -E -i "s/'dbuser' => '.*'/'dbuser' => '${DB_USER}'/" "${OWNCLOUD_AUTOCONFIG}"
-    sed -E -i "s/'dbpass' => '.*'/'dbpass' => '${DB_PASS}'/" "${OWNCLOUD_AUTOCONFIG}"
-    sed -E -i "s/'dbhost' => '.*'/'dbhost' => '${DB_HOST}'/" "${OWNCLOUD_AUTOCONFIG}"
-    sed -E -i "s/'dbtableprefix' => '.*'/'dbtableprefix' => '${DB_TABLE_PREFIX}'/" "${OWNCLOUD_AUTOCONFIG}"
+# TODO can be moved to Dockerfile
+function fix-apc-enable_cli () {
+  grep '^apc.enable_fpm = 1' /etc/php5/fpm/php.ini || echo "apc.enable_fpm = 1" >> /etc/php5/fpm/php.ini
+  grep '^apc.enable_cli = 1' /etc/php5/cli/php.ini || echo "apc.enable_cli = 1" >> /etc/php5/cli/php.ini
+}
+
+function install-and-upgrade () {
+  sleep 5
+  occ | grep 'maintenance:install' && occ maintenance:install \
+      --database "${DB_TYPE}" \
+      --database-name "${DB_NAME}" \
+      --database-host "${DB_HOST}" \
+      --database-user "${DB_USER}" \
+      --database-pass "${DB_PASS}" \
+      --database-table-prefix "${DB_TABLE_PREFIX}" \
+      --admin-user "${ADMIN_USER}" \
+      --admin-pass "${ADMIN_PASS}" \
+      --data-dir "${DATA_DIR}"
+
+  occ upgrade
+}
+
+function create-docker-config () {
+  cat > "${DOCKER_OWNCLOUD_CONFIG}" <<-EOF
+<?php
+\$CONFIG['dbtype'] = '${DB_TYPE}';
+\$CONFIG['dbname'] = '${DB_NAME}';
+\$CONFIG['dbuser'] = '${DB_USER}';
+\$CONFIG['dbpassword'] = '${DB_PASS}';
+\$CONFIG['dbhost'] = '${DB_HOST}';
+\$CONFIG['dbtableprefix'] = '${DB_TABLE_PREFIX}';
+
+\$defaultPreviewProviders = array(
+  'OC\Preview\PNG',
+  'OC\Preview\JPEG',
+  'OC\Preview\GIF',
+  'OC\Preview\BMP',
+  'OC\Preview\XBitmap',
+  'OC\Preview\MP3',
+  'OC\Preview\TXT',
+  'OC\Preview\MarkDown',
+
+  'OC\Preview\Movie',
+  'OC\Preview\MSOfficeDoc',
+  'OC\Preview\MSOffice2003',
+  'OC\Preview\MSOffice2007',
+  'OC\Preview\OpenDocument',
+  'OC\Preview\StarOffice',
+);
+
+\$allPreviewProviders = array_merge(\$defaultPreviewProviders, array(
+  'OC\Preview\Illustrator',
+  'OC\Preview\Movie',
+  'OC\Preview\MSOffice2003',
+  'OC\Preview\MSOffice2007',
+  'OC\Preview\MSOfficeDoc',
+  'OC\Preview\OpenDocument',
+  'OC\Preview\PDF',
+  'OC\Preview\Photoshop',
+  'OC\Preview\Postscript',
+  'OC\Preview\StarOffice',
+  'OC\Preview\SVG',
+  'OC\Preview\TIFF',
+  'OC\Preview\Font',
+));
+\$CONFIG['enabledPreviewProviders'] = \$defaultPreviewProviders;
+EOF
+
+  if [ $ENABLE_EXTRA_PREVIEW_PROVIDERS = true ]; then
+    sed -i "s/\$CONFIG\['enabledPreviewProviders'] =.*;/\$CONFIG['enabledPreviewProviders'] = \$allPreviewProviders;/" "${DOCKER_OWNCLOUD_CONFIG}"
   fi
 }
 
-prepare-env
+function modify-trusted-domains () {
+  [ -z ${TRUSTED_DOMAIN} ] && return
 
-OWNCLOUD_CONFIG=/var/www/owncloud/config/config.php
-OWNCLOUD_AUTOCONFIG=/var/www/owncloud/config/autoconfig.php
-if [ ! -f "${OWNCLOUD_CONFIG}" ]; then
-  create-autoconfig
-  create-config
-fi
+  cat >> "${DOCKER_OWNCLOUD_CONFIG}" <<-EOF
+\$trusted_domains = array('${TRUSTED_DOMAIN}');
+if (array_key_exists('trusted_domains', \$CONFIG)) {
+  \$CONFIG['trusted_domains'] = array_merge(\$CONFIG['trusted_domains'], \$trusted_domains);
+} else {
+  \$CONFIG['trusted_domains'] = \$trusted_domains;
+}
+EOF
+}
 
-modify-config
-set-upload-size
-fix-raw-post-data
-load-entrypoint.d
-chown -R www-data:www-data /var/www/owncloud
-exec "$@"
+function include-docker-config () {
+  grep "${DOCKER_OWNCLOUD_CONFIG}" "${OWNCLOUD_CONFIG}" || echo "include('${DOCKER_OWNCLOUD_CONFIG}');" >> "${OWNCLOUD_CONFIG}"
+}
+
+function download-owncloud-certs () {
+  OWNCLOUD_CERTFILE="/var/www/owncloud/config/ca-bundle.crt"
+  [ -f "${OWNCLOUD_CERTFILE}" ] && return
+  curl --output "${OWNCLOUD_CERTFILE}" https://raw.githubusercontent.com/owncloud/core/v${OWNCLOUD_VERSION}/config/ca-bundle.crt
+}
+
+function fix-permissions () {
+  chown -R www-data:www-data /var/www/owncloud
+}
+
+main "$@"
