@@ -77,14 +77,17 @@ function main () {
   modify-trusted-domains
   include-docker-config
   download-owncloud-certs
+
   set-upload-size
   fix-raw-post-data
   fix-apc-enable_cli
   fix-clear_env
+
+  load-entrypoint.d
+
   fix-permissions
   install-and-upgrade
   include-docker-config
-  load-entrypoint.d
 
   trap teardown SIGTERM SIGINT
   "$@" &
