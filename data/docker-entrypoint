@@ -75,6 +75,7 @@ function main () {
   create-config
   create-docker-config
   modify-trusted-domains
+  include-docker-config
   download-owncloud-certs
   set-upload-size
   fix-raw-post-data
