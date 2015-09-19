@@ -9,7 +9,7 @@ RUN sed -i 's/httpredir/http.us/g' /etc/apt/sources.list \
     && apt-get autoclean \
     && apt-get autoremove
 
-ENV OWNCLOUD_VERSION=8.1.1
+ENV OWNCLOUD_VERSION=8.1.3
 RUN curl -L https://download.owncloud.org/community/owncloud-${OWNCLOUD_VERSION}.tar.bz2 | tar -xj -C /var/www
 
 RUN mkdir /docker-entrypoint.d /var/www/owncloud/user-apps /var/log/owncloud
