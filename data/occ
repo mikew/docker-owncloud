@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 cd /var/www/owncloud
-su www-data -s /bin/sh -c 'php occ "$@"' -- occ "$@"
+exec su www-data -s /bin/sh -c 'php occ "$@"' -- occ "$@"
